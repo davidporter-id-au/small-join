@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"strings"
 
 	"log"
@@ -13,9 +12,10 @@ import (
 )
 
 func main() {
+
 	var joinStr string
 	var join smallJoin.Jointype
-	var indexFile string
+	var right string
 
 	var lSeparator string
 	var lJsonSubquery string
@@ -26,27 +26,23 @@ func main() {
 	var rJoinColumn int
 	var debugMode bool
 
+	flag.StringVar(&right, "right", "", "the right side of the join file with the incoming stream, ie the indexes to read in")
 	flag.StringVar(&joinStr, "join", "inner", "options: [inner|left|disjoint] The 'sql' type of join to apply on the two data streams")
 	flag.BoolVar(&debugMode, "verbose", false, "output debug information")
 
-	flag.StringVar(&lSeparator, "left-separator", "", "a separator for the incoming stream")
+	flag.StringVar(&lSeparator, "left-separator", ",", "a separator for the incoming stream")
 	flag.StringVar(&lJsonSubquery, "left-json-subquery", "", "the JMES path to query and do a join on")
-	flag.IntVar(&lJoinColumn, "lJoin-column", -1, "the column number with which to attempt to join on. -1 imples there's no columns and to join on the entire row")
+	flag.IntVar(&lJoinColumn, "left-join-column", -1, "the column number with which to attempt to join on. -1 imples there's no columns and to join on the entire row")
 
 	flag.StringVar(&rSeparator, "right-separator", "", "a separator for the index file's columns with which to split it (eg, a comman for CSVs)")
 	flag.StringVar(&rJsonSubquery, "right-json-subquery", "", "the JMES path to query and do a join on (if the contents of the column are JSON)")
 	flag.IntVar(&rJoinColumn, "right-column", -1, "the column number with which to attempt to join on if there's a need to join only on a single column. \n-1 implies there's no clumns and join on the entire row")
 
 	flag.Parse()
-	if len(flag.Args()) < 1 {
-		fmt.Printf("Usage: %s <the file of indexes to join on> --join [inner|left] < <data file to pipe in>\n", os.Args[0])
-		os.Exit(1)
-	}
-	indexFile = flag.Arg(0)
 
-	s, err := os.Stat(indexFile)
+	s, err := os.Stat(right)
 	if err != nil {
-		log.Fatalf("Could not read right join file: %v", err)
+		log.Fatalf("Could not read right join file: %v, file: %v", err, right)
 	}
 	if s.IsDir() {
 		log.Fatalf("not a valid file to join on")
@@ -66,7 +62,7 @@ func main() {
 		os.Stdout,
 		os.Stderr,
 		smallJoin.Options{
-			IndexFile:       indexFile,
+			IndexFile:       right,
 			Jointype:        join,
 			OutputDebugMode: debugMode,
 			LeftQueryOptions: smallJoin.QueryOptions{

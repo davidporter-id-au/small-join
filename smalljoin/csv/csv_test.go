@@ -1,4 +1,4 @@
-package smalljoin
+package csv
 
 import (
 	"testing"
@@ -14,6 +14,35 @@ func TestBreakingUpCSVColumns(t *testing.T) {
 		expectedValue []string
 		expectedErr   error
 	}{
+		"simple cases 1": {
+			input: `a,a`,
+			expectedValue: []string{
+				`a`,
+				`a`,
+			},
+		},
+		"simple cases 2": {
+			input: `a,a,,`,
+			expectedValue: []string{
+				`a`,
+				`a`,
+				``,
+				``,
+			},
+		},
+		"A quoted line": {
+			input: `"{\"data1\":1232,\"data2\":\"\"}"`,
+			expectedValue: []string{
+				`{"data1":1232,"data2":""}`,
+			},
+		},
+		"A quoted line with csvs": {
+			input: `"{\"data1\":1232,\"data2\":\"\"}","asdf"`,
+			expectedValue: []string{
+				`{"data1":1232,"data2":""}`,
+				`asdf`,
+			},
+		},
 		"a valid CSV line": {
 			input: `11603FEA-FB08-4E17-A037-74F1975B02E5,11603FEA-FB08-4E17-A037-74F1975B02E5,,"{\"data1\":1232,\"data2\":\"\"}","{\"data 3\":[1, 2, 3]}","another string"`,
 			expectedValue: []string{
@@ -22,6 +51,7 @@ func TestBreakingUpCSVColumns(t *testing.T) {
 				"",
 				`{"data1":1232,"data2":""}`,
 				`{"data 3":[1, 2, 3]}`,
+				`another string`,
 			},
 		},
 	}

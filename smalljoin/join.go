@@ -3,9 +3,9 @@ package smalljoin
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/davidporter-id-au/small-join/smalljoin/csv"
 	"github.com/jmespath/go-jmespath"
 )
 
@@ -13,8 +13,6 @@ type Result struct {
 	left  *string
 	right *string
 }
-
-var csvRegexpHack = regexp.MustCompile("")
 
 // Join is the main function which takes a string line from the input
 // and attempts to match it against the index according to whatever settings
@@ -24,7 +22,6 @@ func (j *joiner) join(leftjoinRow string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	right, ok := j.hashIndex[leftJoinCell]
 	if ok {
 		return &Result{
@@ -68,7 +65,14 @@ func searchJSONWithQuery(jsonData string, query string) (string, error) {
 
 func attemptSplitAndSelectCol(row string, options QueryOptions, continueOnError bool) (string, error) {
 	if options.Separator == "," && options.JsonSubquery != "" {
-		return "", fmt.Errorf("fatal error: it's not possible to split columns containing JSON with commas")
+		cols, err := csv.BreakCSVIntoColumns(row)
+		if err != nil {
+			return "", err
+		}
+		if len(cols) < options.JoinColumn {
+			return "", fmt.Errorf("attempted to index into CSV column %v, but only %v columns found: %v", options.JoinColumn, len(cols), cols)
+		}
+		return searchJSONWithQuery(cols[options.JoinColumn], options.JsonSubquery)
 	}
 	if options.JoinColumn < 0 {
 		return strings.TrimSpace(row), nil
