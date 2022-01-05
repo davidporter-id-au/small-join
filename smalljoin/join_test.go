@@ -7,6 +7,57 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestJoin(t *testing.T) {
+
+	var leftSample = `{"data": "key-1"}`
+	var leftSample2 = `{"data": "key-2"}`
+
+	var rightSample = `right-join-data`
+	index := rightIndex{"key-1": indexEntry{data: rightSample}}
+
+	tests := map[string]struct {
+		input         string
+		jsonQuery     string
+		expectedValue *Result
+		expectedErr   error
+	}{
+		"found value with string": {
+			input:     leftSample,
+			jsonQuery: "data",
+			expectedValue: &Result{
+				Left:  &leftSample,
+				Right: &rightSample,
+			},
+		},
+		"value not present": {
+			input:     leftSample2,
+			jsonQuery: "data",
+			expectedValue: &Result{
+				Left:  &leftSample2,
+				Right: nil,
+			},
+		},
+	}
+
+	for name, td := range tests {
+		t.Run(name, func(t *testing.T) {
+			j := joiner{
+				hashIndex: index,
+				options: Options{
+					LeftQueryOptions: QueryOptions{
+						JsonSubquery: "data",
+						JoinColumn:   -1,
+					},
+				},
+			}
+			res, err := j.join(td.input)
+
+			assert.Equal(t, td.expectedValue, res, name)
+			assert.Equal(t, td.expectedErr, err, name)
+		})
+	}
+}
+
 func TestJMESQueryStringQuery(t *testing.T) {
 
 	tests := map[string]struct {
@@ -40,7 +91,7 @@ func TestJMESQueryStringQuery(t *testing.T) {
 
 	for name, td := range tests {
 		t.Run(name, func(t *testing.T) {
-			res, err := searchJSONWithQuery(td.input, td.jsonQuery)
+			res, err := searchJSONWithQuery(td.input, QueryOptions{JsonSubquery: td.jsonQuery})
 			assert.Equal(t, td.expectedValue, res, name)
 			assert.Equal(t, td.expectedErr, err, name)
 		})
@@ -54,7 +105,6 @@ func TestColSplitting(t *testing.T) {
 		input         string
 		expectedValue string
 		expectedErr   error
-		continueOnErr bool
 	}{
 		"text simple first column": {
 			input: `E3A75F6C-03B6-4C52-B5A3-E2DECD75DA19, asdf`,
@@ -83,7 +133,45 @@ func TestColSplitting(t *testing.T) {
 			},
 			expectedValue: "E3A75F6C-03B6-4C52-B5A3-E2DECD75DA19, asdf",
 		},
-		"found a JSON value in the second column, with valid JMESpath query string": {
+		"found a JSON value in the second column, with valid JMESpath query string, double quoted csv seperator": {
+			input: `some other column,"{""data\": ""value""}",blah`,
+			queryoptions: QueryOptions{
+				JsonSubquery:   "data",
+				Separator:      ",",
+				JoinColumn:     1,
+				AttemptToClean: true,
+			},
+			expectedValue: "value",
+		},
+		"found a JSON value in the second column, with valid JMESpath query string, slash quoted csv seperator": {
+			input: `some other column,"{\"data\": \"value\"}",blah`,
+			queryoptions: QueryOptions{
+				JsonSubquery:   "data",
+				Separator:      ",",
+				JoinColumn:     1,
+				AttemptToClean: true,
+			},
+			expectedValue: "value",
+		},
+		"CSV separator with too few columns": {
+			input: `1,2`,
+			queryoptions: QueryOptions{
+				JsonSubquery: "data",
+				Separator:    ",",
+				JoinColumn:   3,
+			},
+			expectedErr: errors.New("failure to parse CSV and fetch column 3, only found 2 columns. Data: 1,2"),
+		},
+		"all cols": {
+			input: `{"data": "value"}`,
+			queryoptions: QueryOptions{
+				JsonSubquery: "data",
+				Separator:    "",
+				JoinColumn:   -1,
+			},
+			expectedValue: "value",
+		},
+		"found a JSON value in the second column, with valid JMESpath query string, pipe seperator": {
 			input: `some other column | {"data": "value"} | blah`,
 			queryoptions: QueryOptions{
 				JsonSubquery: "data",
@@ -110,20 +198,11 @@ func TestColSplitting(t *testing.T) {
 			},
 			expectedErr: errors.New("couldn't split row with separator | and get '2'th column. Only 2 columns found. Remember this is zero-based index. \n\nRow contents: {\"data\": [\"123\", \"123\"]} | blah"),
 		},
-		"error case: comman separator with JSON - can't be split correctly": {
-			input: `{"data": ["123", "123"]}, blah`,
-			queryoptions: QueryOptions{
-				JsonSubquery: "data[0]",
-				Separator:    ",",
-				JoinColumn:   0,
-			},
-			expectedErr: errors.New("fatal error: it's not possible to split columns containing JSON with commas"),
-		},
 	}
 
 	for name, td := range tests {
 		t.Run(name, func(t *testing.T) {
-			res, err := attemptSplitAndSelectCol(td.input, td.queryoptions, td.continueOnErr)
+			res, err := attemptSplitAndSelectCol(td.input, td.queryoptions)
 			assert.Equal(t, td.expectedValue, res, name)
 			assert.Equal(t, td.expectedErr, err, name)
 		})

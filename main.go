@@ -25,10 +25,14 @@ func main() {
 	var rJsonSubquery string
 	var rJoinColumn int
 	var debugMode bool
+	var continueOnError bool
+	var attemptToClean bool
 
 	flag.StringVar(&right, "right", "", "the right side of the join file with the incoming stream, ie the indexes to read in")
 	flag.StringVar(&joinStr, "join", "inner", "options: [inner|left|disjoint] The 'sql' type of join to apply on the two data streams")
 	flag.BoolVar(&debugMode, "verbose", false, "output debug information")
+	flag.BoolVar(&continueOnError, "continue", false, "continue on error")
+	flag.BoolVar(&attemptToClean, "clean", true, "try to clean up data before joining")
 
 	flag.StringVar(&lSeparator, "left-separator", ",", "a separator for the incoming stream")
 	flag.StringVar(&lJsonSubquery, "left-json-subquery", "", "the JMES path to query and do a join on")
@@ -40,9 +44,12 @@ func main() {
 
 	flag.Parse()
 
+	if right == "" {
+		log.Fatalf("the '--right' flag is required to join on the incoming stream")
+	}
 	s, err := os.Stat(right)
 	if err != nil {
-		log.Fatalf("Could not read right join file: %v, file: %v", err, right)
+		log.Fatalf("Could not read right join file: %v, file: %q", err, right)
 	}
 	if s.IsDir() {
 		log.Fatalf("not a valid file to join on")
@@ -53,8 +60,10 @@ func main() {
 		join = smalljoin.JoinTypeInner
 	case "left":
 		join = smalljoin.JoinTypeLeft
+	case "disjoint":
+		join = smalljoin.JoinTypeDisjoint
 	default:
-		log.Fatalf("not a valid join %q, options are: 'inner', 'left'\n", joinStr)
+		log.Fatalf("not a valid join %q, options are: 'inner', 'left', disjoint\n", joinStr)
 	}
 
 	joiner := smallJoin.New(
@@ -65,15 +74,18 @@ func main() {
 			IndexFile:       right,
 			Jointype:        join,
 			OutputDebugMode: debugMode,
+			ContinueOnErr:   continueOnError,
 			LeftQueryOptions: smallJoin.QueryOptions{
-				JoinColumn:   lJoinColumn,
-				Separator:    lSeparator,
-				JsonSubquery: lJsonSubquery,
+				JoinColumn:     lJoinColumn,
+				Separator:      lSeparator,
+				JsonSubquery:   lJsonSubquery,
+				AttemptToClean: attemptToClean,
 			},
 			RightQueryOptions: smallJoin.QueryOptions{
-				JoinColumn:   rJoinColumn,
-				Separator:    rSeparator,
-				JsonSubquery: rJsonSubquery,
+				JoinColumn:     rJoinColumn,
+				Separator:      rSeparator,
+				JsonSubquery:   rJsonSubquery,
+				AttemptToClean: attemptToClean,
 			},
 		})
 

@@ -29,7 +29,7 @@ type joiner struct {
 	options     Options
 	critLock    sync.RWMutex
 	moreContent bool
-	hashIndex   map[string]string
+	hashIndex   rightIndex
 }
 
 func New(inputstream io.ReadCloser, outputstream io.WriteCloser, errStream io.WriteCloser, o Options) Joiner {
@@ -88,6 +88,7 @@ func (j *joiner) readInput(inputStream io.ReadCloser) error {
 	for {
 		_, err := inputStream.Read(d)
 		if io.EOF == err {
+			d = []byte{}
 			break
 		}
 		if err != nil {
@@ -96,6 +97,12 @@ func (j *joiner) readInput(inputStream io.ReadCloser) error {
 
 		data, newRemainder := splitInputBytes(remainder, d)
 		remainder = newRemainder
+
+		// for i, v := range data {
+		// 	if len(v) < 160 {
+		// 		// fmt.Println("==>", i, string(d))
+		// 	}
+		// }
 		j.incoming <- data
 	}
 	close(j.incoming)
@@ -108,19 +115,19 @@ func (j *joiner) readInput(inputStream io.ReadCloser) error {
 // in memory. This isn't going to work for large index files, so a future
 // iteration of this will probably build an index which contains file-offsets.
 // but for now this is the MVP
-func createIndexMap(right string, queryOptions QueryOptions) (map[string]string, error) {
+func createIndexMap(right string, queryOptions QueryOptions) (rightIndex, error) {
 	d, err := ioutil.ReadFile(right)
 	if err != nil {
 		return nil, err
 	}
 	split := strings.Split(string(d), "\n")
-	out := map[string]string{}
+	out := rightIndex{}
 	for _, line := range split {
-		k, err := attemptSplitAndSelectCol(line, queryOptions, false)
+		k, err := attemptSplitAndSelectCol(line, queryOptions)
 		if err != nil {
 			return nil, err
 		}
-		out[k] = line
+		out[k] = indexEntry{data: line}
 	}
 	return out, nil
 }
@@ -134,6 +141,7 @@ func (j *joiner) Run() error {
 
 	j.readWG.Add(1)
 	go j.readInput(j.streams.input)
+	go j.handleErrors()
 
 	for i := 0; i < j.options.Concurrency; i++ {
 		j.writeWG.Add(1)
@@ -143,6 +151,7 @@ func (j *joiner) Run() error {
 	j.readWG.Wait()
 	j.writeWG.Wait()
 	j.drain()
+	close(j.errors)
 	return nil
 }
 
@@ -166,9 +175,14 @@ func (j *joiner) process(i int) {
 		for _, line := range datablock {
 			joinResult, err := j.join(line)
 			if err != nil {
-				log.Fatalf("fatal error in processing: %v", err)
+				j.errors <- fmt.Errorf("%v, original data: %q", err, line)
+				continue
 			}
-			j.writeOutResult(*joinResult)
+			err = j.writeOutResult(*joinResult, line)
+			if err != nil {
+				j.errors <- err
+				continue
+			}
 		}
 	}
 	j.writeWG.Done()
@@ -183,20 +197,20 @@ func (j *joiner) drain() {
 	}
 }
 
-func (j *joiner) writeOutResult(res Result) error {
+func (j *joiner) writeOutResult(res Result, leftRow string) error {
+	if res.Left == nil {
+		j.debugPrint("No data found in left side. query %q. Data: ", leftRow+"\n", j.options.LeftQueryOptions.JsonSubquery)
+		return nil
+	}
 	switch j.options.Jointype {
 	case JoinTypeLeft:
-		if res.right == nil {
-			fmt.Printf("%s%s\n", *res.left, j.options.LeftQueryOptions.Separator)
-			return nil
-		}
-		fmt.Printf("%s%s%s", *res.left, j.options.LeftQueryOptions.Separator, *res.right)
+		fmt.Fprintf(j.streams.output, "%v\n", res.String())
 		return nil
 	case JoinTypeInner:
-		if res.left != nil && res.right != nil {
-			fmt.Printf("\n%s%s%s", *res.left, j.options.LeftQueryOptions.Separator, *res.right)
+		if res.Left != nil && res.Right != nil {
+			fmt.Fprintf(j.streams.output, "%v\n", res.String())
 		}
-		j.debugPrint("no join", "%s\n", *res.left)
+		j.debugPrint("no join", "%s\n", res.String())
 		return nil
 	}
 	return nil
@@ -206,6 +220,22 @@ func (j joiner) debugPrint(debugMsg string, fmtStr string, args ...interface{}) 
 	if j.options.OutputDebugMode {
 		// todo either use a real logging framework
 		// or use string builder properly
-		j.streams.err.Write([]byte(fmt.Sprintf("\033[33m"+debugMsg+"\033[0m:"+fmtStr, args...)))
+		j.streams.err.Write([]byte(fmt.Sprintf("\033[33m"+debugMsg+"\033[0m "+fmtStr, args...)))
+	}
+}
+
+func (j joiner) handleErrors() {
+	for {
+		err := <-j.errors
+		if err == nil {
+			break // closing & cleaning up
+		}
+		if err != nil && !j.options.ContinueOnErr {
+			log.Fatalf("Fatal error: %v", err)
+		} else {
+			// todo either use a real logging framework
+			// or use string builder properly
+			j.streams.err.Write([]byte(fmt.Sprintf("\033[31mError:\033[0m '%v' \n", err.Error())))
+		}
 	}
 }
