@@ -51,10 +51,9 @@ func main() {
 	}
 
 	if rightIndexFile == "" && rightExecStr == "" {
-		log.Fatalf("the '--right' flag is required to join on the incoming stream or --right-exec-with-exit-code")
+		log.Fatalf("An input from the right-side of the on is required. Use --help to see options")
 	}
 	if rightIndexFile != "" {
-
 		s, err := os.Stat(rightIndexFile)
 		if err != nil {
 			log.Fatalf("Could not read right join file: %v, file: %q", err, rightIndexFile)

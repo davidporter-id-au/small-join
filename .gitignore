@@ -4,6 +4,8 @@
 *.dll
 *.so
 *.dylib
+# the output binary
+small-join
 
 # Test binary, built with `go test -c`
 *.test

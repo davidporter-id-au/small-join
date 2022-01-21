@@ -19,8 +19,8 @@ type ExecResult struct {
 }
 
 type RightResult struct {
-	IndexFileResult *IndexFileResult
-	ExecResult      *ExecResult
+	IndexFileResult *IndexFileResult `json:"IndexFileResult,omitempty"`
+	ExecResult      *ExecResult      `json:"ExecResult,omitempty"`
 }
 
 type Result struct {
