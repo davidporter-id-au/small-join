@@ -15,7 +15,8 @@ func main() {
 
 	var joinStr string
 	var join smallJoin.Jointype
-	var right string
+	var rightIndexFile string
+	var rightExecStr string
 
 	var lSeparator string
 	var lJsonSubquery string
@@ -28,8 +29,9 @@ func main() {
 	var continueOnError bool
 	var attemptToClean bool
 
-	flag.StringVar(&right, "right", "", "the right side of the join file with the incoming stream, ie the indexes to read in")
-	flag.StringVar(&joinStr, "join", "inner", "options: [inner|left|disjoint] The 'sql' type of join to apply on the two data streams")
+	flag.StringVar(&rightIndexFile, "right", "", "the right side of the join file with the incoming stream, ie the indexes to read in")
+	flag.StringVar(&rightExecStr, "right-exec-with-exit-code", "", "A bash string to execute to execute for each line, to attempt to join on")
+	flag.StringVar(&joinStr, "join", "inner", "options: [inner|left|right-is-null] The 'sql' type of join to apply on the two data streams")
 	flag.BoolVar(&debugMode, "verbose", false, "output debug information")
 	flag.BoolVar(&continueOnError, "continue", false, "continue on error")
 	flag.BoolVar(&attemptToClean, "clean", true, "try to clean up data before joining")
@@ -44,15 +46,22 @@ func main() {
 
 	flag.Parse()
 
-	if right == "" {
-		log.Fatalf("the '--right' flag is required to join on the incoming stream")
+	if rightIndexFile != "" && rightExecStr != "" {
+		log.Fatalf("Only an index file or exec string can be specified, not both")
 	}
-	s, err := os.Stat(right)
-	if err != nil {
-		log.Fatalf("Could not read right join file: %v, file: %q", err, right)
+
+	if rightIndexFile == "" && rightExecStr == "" {
+		log.Fatalf("the '--right' flag is required to join on the incoming stream or --right-exec-with-exit-code")
 	}
-	if s.IsDir() {
-		log.Fatalf("not a valid file to join on")
+	if rightIndexFile != "" {
+
+		s, err := os.Stat(rightIndexFile)
+		if err != nil {
+			log.Fatalf("Could not read right join file: %v, file: %q", err, rightIndexFile)
+		}
+		if s.IsDir() {
+			log.Fatalf("not a valid file to join on")
+		}
 	}
 
 	switch strings.ToLower(joinStr) {
@@ -61,7 +70,7 @@ func main() {
 	case "left":
 		join = smalljoin.JoinTypeLeft
 	case "right-is-null":
-		join = smalljoin.RightIsNull
+		join = smalljoin.JoinTypeRightIsNull
 	default:
 		log.Fatalf("not a valid join %q, options are: 'inner', 'left', 'right-is-null'\n", joinStr)
 	}
@@ -71,7 +80,8 @@ func main() {
 		os.Stdout,
 		os.Stderr,
 		smallJoin.Options{
-			IndexFile:       right,
+			IndexFile:       rightIndexFile,
+			RightExecStr:    rightExecStr,
 			Jointype:        join,
 			OutputDebugMode: debugMode,
 			ContinueOnErr:   continueOnError,
@@ -89,7 +99,7 @@ func main() {
 			},
 		})
 
-	err = joiner.Run()
+	err := joiner.Run()
 	if err != nil {
 		log.Fatalf("Fatal error while trying to join: %s", err)
 	}

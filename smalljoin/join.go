@@ -3,7 +3,9 @@ package smalljoin
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -15,20 +17,20 @@ import (
 var slashEscapeForQuotesRE = regexp.MustCompile(`\\\"`)
 var doubleQuotes = regexp.MustCompile(`""`)
 
-type Result struct {
-	Left  *string
-	Right *string
-}
-
-func (r Result) String() string {
-	d, _ := json.Marshal(r)
-	return string(d)
-}
-
 // Join is the main function which takes a string line from the input
 // and attempts to match it against the index according to whatever settings
 // are configured.
 func (j *joiner) join(leftjoinRow string) (*Result, error) {
+	if j.options.IndexFile != "" {
+		return j.joinIndexFile(leftjoinRow)
+	}
+	if j.options.RightExecStr != "" {
+		return j.joinExecStr(leftjoinRow)
+	}
+	panic("no configured joining options")
+}
+
+func (j *joiner) joinIndexFile(leftjoinRow string) (*Result, error) {
 	leftJoinCell, err := attemptSplitAndSelectCol(leftjoinRow, j.options.LeftQueryOptions)
 	if err != nil {
 		return nil, err
@@ -40,13 +42,74 @@ func (j *joiner) join(leftjoinRow string) (*Result, error) {
 	if ok {
 		atomic.AddInt32(&right.joinCount, 1)
 		return &Result{
-			Left:  &leftjoinRow,
-			Right: &right.data,
+			Left: &LeftResult{
+				Row:   leftjoinRow,
+				Index: leftJoinCell,
+			},
+			Right: &RightResult{
+				IndexFileResult: &IndexFileResult{
+					Index: leftJoinCell,
+					Row:   right.data,
+				},
+			},
 		}, nil
 	}
 	return &Result{
-		Left:  &leftjoinRow,
+		Left: &LeftResult{
+			Index: leftJoinCell,
+			Row:   leftjoinRow,
+		},
 		Right: nil,
+	}, nil
+}
+
+func (j *joiner) joinExecStr(leftjoinRow string) (*Result, error) {
+	leftJoinCell, err := attemptSplitAndSelectCol(leftjoinRow, j.options.LeftQueryOptions)
+	if err != nil {
+		return nil, err
+	}
+	if leftJoinCell == "" {
+		return &Result{}, nil
+	}
+
+	cmd := exec.Command("bash", "-c", strings.ReplaceAll(j.options.RightExecStr, "{}", leftJoinCell))
+	stdout, err := cmd.CombinedOutput()
+	stdOutStr := string(stdout)
+	if err != nil {
+		var e *exec.ExitError
+		if errors.As(err, &e) {
+			code := e.ProcessState.ExitCode()
+			stdErrStr := string(e.Stderr)
+			return &Result{
+				Left: &LeftResult{
+					Index: leftJoinCell,
+					Row:   leftjoinRow,
+				},
+				Right: &RightResult{
+					ExecResult: &ExecResult{
+						ExecStdout: stdOutStr,
+						ExecStdErr: stdErrStr,
+						ExitCode:   code,
+					},
+				},
+			}, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	exitCode := 0
+	return &Result{
+		Left: &LeftResult{
+			Index: leftJoinCell,
+			Row:   leftjoinRow,
+		},
+		Right: &RightResult{
+			ExecResult: &ExecResult{
+				ExecStdout: stdOutStr,
+				ExitCode:   exitCode,
+			},
+		},
 	}, nil
 }
 

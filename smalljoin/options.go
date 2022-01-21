@@ -1,6 +1,6 @@
 package smalljoin
 
-const defaultConcurrency = 1
+const defaultConcurrency = 10
 const defaultInputByteLen = 5000
 
 type Jointype int
@@ -8,7 +8,7 @@ type Jointype int
 const (
 	JoinTypeInner = iota
 	JoinTypeLeft
-	RightIsNull
+	JoinTypeRightIsNull
 )
 
 type QueryOptions struct {
@@ -22,6 +22,7 @@ type Options struct {
 	IncomingBufferSize int
 	Concurrency        int
 	IndexFile          string
+	RightExecStr       string
 	Jointype           Jointype
 	LeftQueryOptions   QueryOptions
 	RightQueryOptions  QueryOptions

@@ -80,11 +80,13 @@ func createIndexMap(right string, queryOptions QueryOptions) (rightIndex, error)
 }
 
 func (j *joiner) Run() error {
-	i, err := createIndexMap(j.options.IndexFile, j.options.RightQueryOptions)
-	if err != nil {
-		return err
+	if j.options.IndexFile != "" {
+		i, err := createIndexMap(j.options.IndexFile, j.options.RightQueryOptions)
+		if err != nil {
+			return err
+		}
+		j.hashIndex = i
 	}
-	j.hashIndex = i
 
 	j.readWG.Add(1)
 	go j.readInput(j.streams.input)
@@ -149,21 +151,10 @@ func (j *joiner) writeOutResult(res Result, leftRow string) error {
 		j.debugPrint("No data found in left side. query %q. Data: ", leftRow+"\n", j.options.LeftQueryOptions.JsonSubquery)
 		return nil
 	}
-	switch j.options.Jointype {
-	case JoinTypeLeft:
+	if res.SuccessfulJoin(j.options.Jointype) {
 		fmt.Fprintf(j.streams.output, "%v\n", res.String())
-		return nil
-	case RightIsNull:
-		if res.Left != nil && res.Right == nil {
-			fmt.Fprintf(j.streams.output, "%v\n", res.String())
-		}
-		return nil
-	case JoinTypeInner:
-		if res.Left != nil && res.Right != nil {
-			fmt.Fprintf(j.streams.output, "%v\n", res.String())
-		}
+	} else {
 		j.debugPrint("no join", "%s\n", res.String())
-		return nil
 	}
 	return nil
 }

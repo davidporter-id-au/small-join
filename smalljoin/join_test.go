@@ -25,15 +25,26 @@ func TestJoin(t *testing.T) {
 			input:     leftSample,
 			jsonQuery: "data",
 			expectedValue: &Result{
-				Left:  &leftSample,
-				Right: &rightSample,
+				Left: &LeftResult{
+					Index: "key-1",
+					Row:   leftSample,
+				},
+				Right: &RightResult{
+					IndexFileResult: &IndexFileResult{
+						Index: "key-1",
+						Row:   rightSample,
+					},
+				},
 			},
 		},
 		"value not present": {
 			input:     leftSample2,
 			jsonQuery: "data",
 			expectedValue: &Result{
-				Left:  &leftSample2,
+				Left: &LeftResult{
+					Index: "key-2",
+					Row:   leftSample2,
+				},
 				Right: nil,
 			},
 		},
@@ -44,6 +55,7 @@ func TestJoin(t *testing.T) {
 			j := joiner{
 				hashIndex: index,
 				options: Options{
+					IndexFile: "some file",
 					LeftQueryOptions: QueryOptions{
 						JsonSubquery: "data",
 						JoinColumn:   -1,
