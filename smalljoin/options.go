@@ -8,7 +8,7 @@ type Jointype int
 const (
 	JoinTypeInner = iota
 	JoinTypeLeft
-	JoinTypeDisjoint
+	RightIsNull
 )
 
 type QueryOptions struct {

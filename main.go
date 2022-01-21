@@ -60,10 +60,10 @@ func main() {
 		join = smalljoin.JoinTypeInner
 	case "left":
 		join = smalljoin.JoinTypeLeft
-	case "disjoint":
-		join = smalljoin.JoinTypeDisjoint
+	case "right-is-null":
+		join = smalljoin.RightIsNull
 	default:
-		log.Fatalf("not a valid join %q, options are: 'inner', 'left', disjoint\n", joinStr)
+		log.Fatalf("not a valid join %q, options are: 'inner', 'left', 'right-is-null'\n", joinStr)
 	}
 
 	joiner := smallJoin.New(
