@@ -5,7 +5,7 @@
 *.so
 *.dylib
 # the output binary
-smalljoin
+small-join*
 
 # Test binary, built with `go test -c`
 *.test
