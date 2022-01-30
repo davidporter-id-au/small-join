@@ -1,0 +1,2 @@
+{"Left":{"Index":"a","Row":"1,col1,col2,\"test\",\"{\\\"data\\\": {\\\"index\\\":\\\"a\"}}\""},"Right":{"IndexFileResult":{"Index":"a","Row":"a"}}}
+{"Left":{"Index":"b","Row":"2,col1,col2,\"test\",\"{\\\"data\\\": {\\\"index\\\":\\\"b\"}}\""},"Right":{"IndexFileResult":{"Index":"b","Row":"b"}}}
