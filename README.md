@@ -74,3 +74,11 @@ Those are abolutely better, more powerful, more specialised, better maintained a
 ### Building
 
 run `make`
+
+### Installation
+
+For OSX:
+```
+curl https://github.com/davidporter-id-au/small-join/releases/download/0.0.1/small-join_darwin -o /usr/local/bin/small-join -L \
+    && chmod +x /usr/local/bin/small-join
+```
