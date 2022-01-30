@@ -8,13 +8,12 @@ import (
 	"os"
 
 	"github.com/davidporter-id-au/small-join/smalljoin"
-	smallJoin "github.com/davidporter-id-au/small-join/smalljoin"
 )
 
 func main() {
 
 	var joinStr string
-	var join smallJoin.Jointype
+	var join smalljoin.Jointype
 	var rightIndexFile string
 	var rightExecStr string
 
@@ -74,23 +73,23 @@ func main() {
 		log.Fatalf("not a valid join %q, options are: 'inner', 'left', 'right-is-null'\n", joinStr)
 	}
 
-	joiner := smallJoin.New(
+	joiner := smalljoin.New(
 		os.Stdin,
 		os.Stdout,
 		os.Stderr,
-		smallJoin.Options{
+		smalljoin.Options{
 			IndexFile:       rightIndexFile,
 			RightExecStr:    rightExecStr,
 			Jointype:        join,
 			OutputDebugMode: debugMode,
 			ContinueOnErr:   continueOnError,
-			LeftQueryOptions: smallJoin.QueryOptions{
+			LeftQueryOptions: smalljoin.QueryOptions{
 				JoinColumn:     lJoinColumn,
 				Separator:      lSeparator,
 				JsonSubquery:   lJsonSubquery,
 				AttemptToClean: attemptToClean,
 			},
-			RightQueryOptions: smallJoin.QueryOptions{
+			RightQueryOptions: smalljoin.QueryOptions{
 				JoinColumn:     rJoinColumn,
 				Separator:      rSeparator,
 				JsonSubquery:   rJsonSubquery,

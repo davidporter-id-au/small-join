@@ -153,6 +153,11 @@ func searchJSONWithQuery(jsonData string, options QueryOptions) (string, error) 
 }
 
 func attemptSplitAndSelectCol(row string, options QueryOptions) (string, error) {
+
+	if strings.TrimSpace(row) == "" {
+		return "", nil
+	}
+
 	if options.JoinColumn < 0 && options.JsonSubquery == "" {
 		return row, nil // if we're joining on the whole row, don't bother splitting
 	}

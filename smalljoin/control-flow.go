@@ -83,7 +83,7 @@ func (j *joiner) Run() error {
 	if j.options.IndexFile != "" {
 		i, err := createIndexMap(j.options.IndexFile, j.options.RightQueryOptions)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse index: %w", err)
 		}
 		j.hashIndex = i
 	}
